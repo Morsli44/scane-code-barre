@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#2563eb">
+    <title>مخزني الذكي</title>
+
+    <script src="https://unpkg.com/html5-qrcode"></script>
+
+    <style>
+        :root { --primary: #10b981; --accent: #2563eb; --sale: #f59e0b; --danger: #ef4444; --bg: #f8fafc; }
+        * { -webkit-tap-highlight-color: transparent; }
+        body { font-family: system-ui, sans-serif; background: var(--bg); margin: 0; padding: 10px; overflow-x: hidden; }
+        .container { width: 100%; max-width: 500px; background: white; padding: 15px; border-radius: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); margin: auto; min-height: 90vh; box-sizing: border-box; }
+
+        .tabs { display: flex; gap: 8px; margin-bottom: 15px; }
+        .tab-btn { flex: 1; padding: 14px; border: none; border-radius: 15px; cursor: pointer; font-weight: bold; background: #f1f5f9; font-size: 15px; transition: 0.3s; }
+        .tab-btn.active { color: white; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .add-mode.active { background: var(--primary); }
+        .sale-mode.active { background: var(--sale); }
+
+        #reader { width: 100%; border-radius: 20px; overflow: hidden; border: 3px solid #f1f5f9; background: #000; position: relative; }
+        #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; color: white; font-size: 18px; z-index: 10; border-radius: 20px; }
+
+        .panel { display: none; margin-top: 15px; }
+        .panel.active { display: block; }
+
+        input { width: 100%; padding: 14px; margin: 6px 0; border: 2px solid #f1f5f9; border-radius: 12px; box-sizing: border-box; font-size: 16px; outline: none; }
+        input:focus { border-color: var(--accent); }
+        .btn { width: 100%; padding: 15px; border: none; border-radius: 15px; font-weight: bold; cursor: pointer; color: white; margin-top: 10px; font-size: 16px; }
+
+        #cart-area { background: #fffbeb; border: 2px solid #fef3c7; padding: 15px; border-radius: 18px; margin-top: 15px; text-align: right; }
+        .total-box { background: var(--sale); color: white; padding: 18px; border-radius: 15px; margin-top: 12px; font-size: 24px; font-weight: 900; text-align: center; }
+
+        .product-item { background: #fff; border-bottom: 1px solid #f1f5f9; padding: 12px; display: flex; justify-content: space-between; align-items: center; }
+        .cart-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #fbbf24; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="tabs">
+        <button class="tab-btn add-mode active" onclick="switchMode('add')">📥 توريد</button>
+        <button class="tab-btn sale-mode" onclick="switchMode('sale')">🛒 بيع</button>
+    </div>
+
+    <div id="reader">
+        <div id="overlay">تم المسح.. انتظر ⏳</div>
+    </div>
+
+    <div id="status" style="padding: 10px; font-size: 14px; color: var(--accent); font-weight: 600;">جاهز للعمل</div>
+
+    <div id="add-panel" class="panel active">
+        <div id="input-area" style="display:none; background: #f0fdf4; padding: 15px; border-radius: 15px;">
+            <input type="text" id="itemName" placeholder="اسم المنتج">
+            <input type="number" id="itemPrice" placeholder="السعر (دج)">
+            <input type="number" id="itemQty" placeholder="الكمية المضافة">
+            <button class="btn" style="background:var(--primary)" onclick="confirmSave()">حفظ في المخزن</button>
+        </div>
+    </div>
+
+    <div id="sale-panel" class="panel">
+        <div id="cart-area">
+            <div id="cart-items" style="max-height: 120px; overflow-y: auto;"></div>
+            <div class="total-box">المجموع: <span id="grand-total">0</span> دج</div>
+            <button class="btn" style="background:var(--accent)" onclick="checkoutCart()">تأكيد البيع ✅</button>
+            <button class="btn" style="background:var(--danger); font-size: 13px; padding: 8px;" onclick="clearCart()">حذف السلة</button>
+        </div>
+    </div>
+
+    <button id="start-btn" class="btn" style="background:var(--accent)" onclick="startScanning()">تشغيل الكاميرا</button>
+
+    <div style="margin-top: 25px; text-align: right;">
+        <details>
+            <summary style="cursor:pointer; font-weight:bold; color:var(--accent); padding: 10px; background: #f1f5f9; border-radius: 10px;">📦 عرض حالة المخزن</summary>
+            <div id="result-list"></div>
+        </details>
+    </div>
+</div>
+
+<script>
+    const html5QrCode = new Html5Qrcode("reader");
+    let currentMode = 'add', lastResult = null, count = 0, currentCode = "", shoppingCart = [];
+    const overlay = document.getElementById('overlay');
+
+    function switchMode(mode) {
+        currentMode = mode;
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelector('.' + mode + '-mode').classList.add('active');
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+        document.getElementById(mode + '-panel').classList.add('active');
+        document.getElementById('input-area').style.display = 'none';
+    }
+
+    function startScanning() {
+        document.getElementById('start-btn').style.display = 'none';
+        html5QrCode.start({ facingMode: "environment" }, { fps: 25, qrbox: 250 }, (decodedText) => {
+            if (decodedText === lastResult) count++;
+            else { lastResult = decodedText; count = 1; }
+
+            if (count >= 3) {
+                html5QrCode.pause();
+                if (navigator.vibrate) navigator.vibrate(50);
+
+                if (currentMode === 'add') {
+                    currentCode = decodedText;
+                    document.getElementById('input-area').style.display = 'block';
+                    document.getElementById('status').innerText = "أدخل بيانات المنتج الجديد";
+                } else {
+                    addToCart(decodedText);
+                    overlay.style.display = 'flex';
+                    setTimeout(() => {
+                        overlay.style.display = 'none';
+                        count = 0; lastResult = null;
+                        html5QrCode.resume();
+                    }, 2000);
+                }
+            }
+        });
+    }
+
+    function addToCart(code) {
+        let products = JSON.parse(localStorage.getItem('myStore') || "[]");
+        let p = products.find(prod => prod.code === code);
+        if (p) {
+            if (p.qty > 0) {
+                shoppingCart.push({ name: p.name, price: parseFloat(p.price), code: p.code });
+                updateCartUI();
+                document.getElementById('status').innerText = "تمت إضافة: " + p.name;
+            } else { alert("عذراً، هذا المنتج نفد من المخزن!"); html5QrCode.resume(); }
+        } else { alert("هذا المنتج غير مسجل!"); html5QrCode.resume(); }
+    }
+
+    function updateCartUI() {
+        const cartDiv = document.getElementById('cart-items');
+        const totalSpan = document.getElementById('grand-total');
+        cartDiv.innerHTML = ""; let total = 0;
+        shoppingCart.forEach(item => {
+            total += item.price;
+            cartDiv.innerHTML += `<div class="cart-item"><span>${item.name}</span><span><b>${item.price} دج</b></span></div>`;
+        });
+        totalSpan.innerText = total;
+    }
+
+    function checkoutCart() {
+        if (shoppingCart.length === 0) return;
+        let products = JSON.parse(localStorage.getItem('myStore') || "[]");
+        shoppingCart.forEach(item => {
+            let idx = products.findIndex(p => p.code === item.code);
+            if (idx !== -1 && products[idx].qty > 0) products[idx].qty -= 1;
+        });
+        localStorage.setItem('myStore', JSON.stringify(products));
+        alert("تم البيع بنجاح ✅\nالإجمالي: " + document.getElementById('grand-total').innerText + " دج");
+        clearCart(); renderList();
+    }
+
+    function clearCart() { shoppingCart = []; updateCartUI(); }
+
+    function confirmSave() {
+        const name = document.getElementById('itemName').value;
+        const price = document.getElementById('itemPrice').value;
+        const qty = parseInt(document.getElementById('itemQty').value) || 0;
+        if (name && price) {
+            let products = JSON.parse(localStorage.getItem('myStore') || "[]");
+            let existingIdx = products.findIndex(p => p.code === currentCode);
+            if (existingIdx !== -1) {
+                products[existingIdx].qty += qty;
+                products[existingIdx].price = price;
+            } else {
+                products.push({ code: currentCode, name, price, qty, id: Date.now() });
+            }
+            localStorage.setItem('myStore', JSON.stringify(products));
+            document.getElementById('input-area').style.display = 'none';
+            document.getElementById('itemName').value = "";
+            document.getElementById('itemPrice').value = "";
+            document.getElementById('itemQty').value = "";
+            renderList(); count = 0; lastResult = null;
+            html5QrCode.resume();
+            document.getElementById('status').innerText = "تم تحديث المخزن ✅";
+        }
+    }
+
+    function renderList() {
+        const list = document.getElementById('result-list');
+        list.innerHTML = "";
+        let products = JSON.parse(localStorage.getItem('myStore') || "[]");
+        products.reverse().forEach(item => {
+            list.innerHTML += `<div class="product-item">
+                <div><b>${item.name}</b><br><small>المخزن: ${item.qty} | ${item.price} دج</small></div>
+                <button onclick="deleteProduct(${item.id})" style="border:none; background:none; color:var(--danger); font-size:20px;">🗑️</button>
+            </div>`;
+        });
+    }
+
+    function deleteProduct(id) {
+        if(confirm("هل أنت متأكد من الحذف؟")) {
+            let products = JSON.parse(localStorage.getItem('myStore') || "[]").filter(p => p.id !== id);
+            localStorage.setItem('myStore', JSON.stringify(products));
+            renderList();
+        }
+    }
+
+    window.onload = renderList;
+</script>
+</body>
+</html>
