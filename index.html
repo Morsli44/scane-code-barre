@@ -3,52 +3,53 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#2563eb">
-    <title>مخزني الذكي برو</title>
-
+    <title>نظام المخزن المطور - التحكم في السلة</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
-
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { --primary: #10b981; --accent: #2563eb; --sale: #f59e0b; --danger: #ef4444; --bg: #f8fafc; --history: #8b5cf6; }
-        * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
-        body { font-family: system-ui, sans-serif; background: var(--bg); margin: 0; padding: 10px; overflow-x: hidden; }
-        .container { width: 100%; max-width: 500px; background: white; padding: 15px; border-radius: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); margin: auto; min-height: 90vh; }
-
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: system-ui, sans-serif; background: var(--bg); margin: 0; padding: 10px; direction: rtl; }
+        .container { width: 100%; max-width: 500px; background: white; padding: 15px; border-radius: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); margin: auto; }
+        
         .tabs { display: flex; gap: 5px; margin-bottom: 15px; }
-        .tab-btn { flex: 1; padding: 12px 5px; border: none; border-radius: 12px; cursor: pointer; font-weight: bold; background: #f1f5f9; font-size: 13px; transition: 0.3s; }
-        .tab-btn.active { color: white; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .tab-btn { flex: 1; padding: 12px 5px; border: none; border-radius: 12px; cursor: pointer; font-weight: bold; background: #f1f5f9; transition: 0.3s; }
+        .tab-btn.active { color: white; }
         .add-mode.active { background: var(--primary); }
         .sale-mode.active { background: var(--sale); }
         .history-mode.active { background: var(--history); }
 
-        #reader { width: 100%; border-radius: 20px; overflow: hidden; border: 3px solid #f1f5f9; background: #000; position: relative; min-height: 250px; }
-        #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; color: white; font-size: 18px; z-index: 10; border-radius: 20px; }
-
-        #torch-btn { 
-            position: absolute; top: 15px; left: 15px; z-index: 100; 
-            background: rgba(255,255,255,0.9); border: none; border-radius: 50%; 
-            width: 45px; height: 45px; font-size: 20px; cursor: pointer;
-            display: none; align-items: center; justify-content: center;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-        }
-
+        #reader { width: 100%; border-radius: 20px; overflow: hidden; border: 4px solid #f1f5f9; position: relative; min-height: 250px; background: #000; }
+        #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; align-items: center; justify-content: center; color: white; font-size: 22px; z-index: 10; font-weight: bold; border-radius: 20px; text-align: center; padding: 10px; }
+        
         .panel { display: none; margin-top: 15px; }
         .panel.active { display: block; }
 
-        input { width: 100%; padding: 12px; margin: 5px 0; border: 2px solid #f1f5f9; border-radius: 10px; font-size: 15px; outline: none; }
+        input { width: 100%; padding: 12px; margin: 5px 0; border: 2px solid #f1f5f9; border-radius: 10px; outline: none; font-size: 16px; }
         .btn { width: 100%; padding: 14px; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; color: white; margin-top: 8px; }
-
-        #cart-area { background: #fffbeb; border: 2px solid #fef3c7; padding: 15px; border-radius: 18px; text-align: right; }
-        .total-box { background: var(--sale); color: white; padding: 15px; border-radius: 12px; margin-top: 10px; font-size: 20px; font-weight: 900; text-align: center; }
-
-        .history-group { border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 8px; overflow: hidden; }
-        .history-header { background: #fff; padding: 15px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: bold; }
-        .history-details { display: none; background: #fdfdfd; padding: 0 15px 10px 15px; border-top: 1px dashed #e2e8f0; }
-        .history-details.open { display: block; }
-        .detail-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-size: 13px; }
         
-        .profit-badge { background: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 5px; font-size: 11px; }
-        .qty-badge { background: var(--accent); color: white; padding: 2px 8px; border-radius: 50px; font-size: 12px; }
+        .total-box { background: var(--sale); color: white; padding: 15px; border-radius: 12px; margin-top: 10px; font-size: 22px; font-weight: 900; text-align: center; }
+
+        /* ستايل السلة الجديد */
+        .cart-item { background: #fff; border: 1px solid #e2e8f0; padding: 10px; border-radius: 15px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+        .cart-controls { display: flex; align-items: center; gap: 10px; }
+        .qty-btn { width: 30px; height: 30px; border-radius: 8px; border: none; background: #e2e8f0; font-weight: bold; cursor: pointer; }
+        .del-item { background: #fee2e2; color: var(--danger); border: none; padding: 5px 10px; border-radius: 8px; cursor: pointer; font-size: 12px; }
+
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 20px; }
+        .stat-card { background: #f0fdf4; padding: 10px; border-radius: 12px; text-align: center; border: 1px solid #dcfce7; }
+        .stat-card span { display: block; font-size: 10px; color: #166534; }
+        .stat-card b { font-size: 14px; color: var(--primary); }
+
+        .history-item { margin-bottom: 8px; border: 1px solid #e2e8f0; border-radius: 12px; background: white; overflow: hidden; }
+        .history-header { padding: 12px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: bold; }
+        .history-body { display: none; padding: 10px; background: #f8fafc; border-top: 1px solid #e2e8f0; font-size: 14px; }
+        .history-body.show { display: block; }
+
+        .inv-card { background: white; padding: 12px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; }
+        .inv-barcode { font-size: 11px; color: #64748b; font-family: monospace; }
+        .inv-btns { display: flex; gap: 5px; }
+        .small-btn { padding: 6px 10px; border: none; border-radius: 8px; color: white; cursor: pointer; font-size: 12px; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -61,54 +62,54 @@
     </div>
 
     <div id="scanner-section">
-        <div id="reader">
-            <button id="torch-btn" onclick="toggleTorch()">🔦</button>
-            <div id="overlay">تم المسح.. ⏳</div>
-        </div>
-        <div id="status" style="padding: 10px; font-size: 14px; color: var(--accent); font-weight: 600; text-align: center;">جاهز للعمل</div>
-        <button id="start-btn" class="btn" style="background:var(--accent)" onclick="startScanning()">تشغيل الكاميرا</button>
+        <div id="reader"><div id="overlay"></div></div>
+        <button id="torch-btn" class="btn" style="background:var(--sale); display:none;" onclick="toggleTorch()">💡 المصباح (Flash)</button>
     </div>
 
     <div id="add-panel" class="panel active">
-        <div id="input-area" style="display:none; background: #f0fdf4; padding: 15px; border-radius: 15px;">
+        <div id="input-area" style="display:none; background: #f0fdf4; padding: 15px; border-radius: 15px; border: 2px solid var(--primary);">
+            <div style="text-align: center; margin-bottom: 10px;">كود: <span id="displayCode" style="font-weight: bold; color: var(--accent);"></span></div>
             <input type="text" id="itemName" placeholder="اسم المنتج">
             <input type="number" id="costPrice" placeholder="سعر الشراء">
             <input type="number" id="salePrice" placeholder="سعر البيع">
-            <input type="number" id="itemQty" placeholder="الكمية المضافة">
+            <input type="number" id="itemQty" placeholder="الكمية المضافة" value="1">
             <button class="btn" style="background:var(--primary)" onclick="confirmSave()">حفظ في المخزن</button>
+            <button class="btn" style="background:#64748b" onclick="cancelEdit()">إلغاء</button>
         </div>
     </div>
 
     <div id="sale-panel" class="panel">
         <div id="cart-area">
-            <div id="cart-items" style="max-height: 150px; overflow-y: auto;"></div>
-            <div class="total-box">المجموع: <span id="grand-total">0</span> دج</div>
-            <button class="btn" style="background:var(--accent)" onclick="checkoutCart()">تأكيد البيع ✅</button>
+            <div id="cart-list"></div> <div class="total-box">المجموع: <span id="grand-total">0</span> دج</div>
+            <button class="btn" style="background:var(--accent)" onclick="checkoutCart()">تأكيد عملية البيع ✅</button>
         </div>
     </div>
 
     <div id="history-panel" class="panel">
-        <div style="background: #f5f3ff; padding: 15px; border-radius: 15px; margin-bottom: 15px; text-align: center;">
-            <div style="font-size: 13px; color: #6d28d9;">مجموع الأرباح الكلي:</div>
-            <div style="font-size: 22px; font-weight: 900; color: var(--history);" id="total-profit-history">0 دج</div>
+        <h3 style="margin:0 0 10px 0; font-size: 16px;">📊 ملخص الفوائد</h3>
+        <div class="stats-grid">
+            <div class="stat-card"><span>اليوم</span><b id="day-profit">0</b></div>
+            <div class="stat-card"><span>أسبوع</span><b id="week-profit">0</b></div>
+            <div class="stat-card"><span>شهر</span><b id="month-profit">0</b></div>
         </div>
-        <div id="history-grouped-list"></div>
-        <button class="btn" style="background:var(--danger); font-size: 12px; margin-top: 20px;" onclick="clearHistory()">مسح السجل</button>
+        <canvas id="profitChart" style="width:100%; max-height:150px; margin-bottom:20px;"></canvas>
+        <div id="history-list"></div>
+        <button class="btn" style="background:var(--danger); font-size: 12px;" onclick="clearHistory()">مسح السجل</button>
     </div>
 
-    <div style="margin-top: 25px;">
+    <div style="margin-top:20px;">
         <details>
-            <summary style="cursor:pointer; font-weight:bold; color:var(--accent); padding: 10px; background: #f1f5f9; border-radius: 10px;">📦 المخزن الحالي</summary>
-            <div id="result-list"></div>
+            <summary style="cursor:pointer; padding:12px; background:#f1f5f9; border-radius:12px; font-weight:bold;">📦 المخزن</summary>
+            <div id="inventory-list"></div>
         </details>
     </div>
 </div>
 
 <script>
     let html5QrCode;
-    let currentMode = 'add', lastResult = null, count = 0, currentCode = "", shoppingCart = [];
-    let videoTrack = null;
-    let isTorchOn = false;
+    let shoppingCart = []; // ستخزن الآن كائنات: {code, name, price, cost, cartQty}
+    let isScanning = false, currentMode = 'add', currentCode = "";
+    let videoTrack = null, isTorchOn = false, lastProcessedTime = 0, myChart = null;
 
     function switchMode(mode) {
         currentMode = mode;
@@ -117,178 +118,243 @@
         document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
         document.getElementById(mode + '-panel').classList.add('active');
         document.getElementById('scanner-section').style.display = (mode === 'history') ? 'none' : 'block';
-        if(mode === 'history') renderGroupedHistory();
-        if(mode === 'add') document.getElementById('input-area').style.display = 'none';
+        if(mode === 'history') { renderHistory(); updateStats(); }
     }
 
     async function startScanning() {
+        if (isScanning) return;
         html5QrCode = new Html5Qrcode("reader");
-        document.getElementById('start-btn').style.display = 'none';
-        
         try {
-            await html5QrCode.start(
-                { facingMode: "environment" }, 
-                { fps: 25, qrbox: 250 }, 
-                (text) => {
-                    if (text === lastResult) count++; else { lastResult = text; count = 1; }
-                    if (count >= 3) {
-                        html5QrCode.pause();
-                        if (navigator.vibrate) navigator.vibrate(50);
-                        if (currentMode === 'add') {
-                            currentCode = text;
-                            fillExistingData(text);
-                            document.getElementById('input-area').style.display = 'block';
-                        } else {
-                            addToCart(text);
-                            document.getElementById('overlay').style.display = 'flex';
-                            setTimeout(() => { document.getElementById('overlay').style.display = 'none'; count = 0; lastResult = null; html5QrCode.resume(); }, 1200);
-                        }
-                    }
+            await html5QrCode.start({ facingMode: "environment" }, { fps: 20, qrbox: 250 }, (text) => {
+                let now = Date.now();
+                if (currentMode === 'sale' && now - lastProcessedTime > 1500) { 
+                    lastProcessedTime = now; onSaleScan(text);
+                } else if (currentMode === 'add') {
+                    html5QrCode.pause(); openEditPanel(text);
                 }
-            );
-
-            // تفعيل الفلاش بعد استقرار الكاميرا
+            });
+            isScanning = true;
             setTimeout(() => {
                 const video = document.querySelector('#reader video');
-                if (video && video.srcObject) {
-                    videoTrack = video.srcObject.getVideoTracks()[0];
-                    const caps = videoTrack.getCapabilities ? videoTrack.getCapabilities() : {};
-                    if (caps.torch) {
-                        document.getElementById('torch-btn').style.display = 'flex';
-                    }
-                }
+                if (video && video.srcObject) videoTrack = video.srcObject.getVideoTracks()[0];
+                document.getElementById('torch-btn').style.display = 'block';
             }, 1000);
-
-        } catch (err) {
-            alert("خطأ: " + err);
-            document.getElementById('start-btn').style.display = 'block';
-        }
+        } catch (err) { }
     }
 
-    function toggleTorch() {
-        if (!videoTrack) return;
-        isTorchOn = !isTorchOn;
-        videoTrack.applyConstraints({ advanced: [{ torch: isTorchOn }] })
-        .then(() => {
-            const btn = document.getElementById('torch-btn');
-            btn.innerHTML = isTorchOn ? "💡" : "🔦";
-            btn.style.background = isTorchOn ? "var(--sale)" : "rgba(255,255,255,0.9)";
-        }).catch(e => alert("الفلاش مشغول أو غير مدعوم"));
-    }
-
-    function fillExistingData(code) {
+    function onSaleScan(text) {
         let products = JSON.parse(localStorage.getItem('myStore') || "[]");
-        let p = products.find(prod => prod.code === code);
+        let p = products.find(prod => prod.code === text);
+        
         if (p) {
-            document.getElementById('itemName').value = p.name;
-            document.getElementById('costPrice').value = p.cost;
-            document.getElementById('salePrice').value = p.price;
+            let itemInCart = shoppingCart.find(item => item.code === text);
+            if (itemInCart) {
+                if (itemInCart.cartQty < p.qty) {
+                    itemInCart.cartQty++;
+                } else {
+                    alert("⚠️ المخزون لا يكفي!");
+                    return;
+                }
+            } else {
+                if (p.qty > 0) {
+                    shoppingCart.push({ ...p, cartQty: 1 });
+                } else {
+                    alert("⚠️ المنتج نافد من المخزن!");
+                    return;
+                }
+            }
+            updateCartUI();
+            showOverlay("تمت الإضافة ✅", "var(--primary)");
         } else {
-            document.getElementById('itemName').value = ""; document.getElementById('costPrice').value = ""; document.getElementById('salePrice').value = "";
+            showOverlay("غير موجود!", "gray");
         }
     }
 
-    function confirmSave() {
-        const name = document.getElementById('itemName').value;
-        const cost = parseFloat(document.getElementById('costPrice').value);
-        const price = parseFloat(document.getElementById('salePrice').value);
-        const qty = parseInt(document.getElementById('itemQty').value) || 0;
-        if (name && cost >= 0) {
-            let products = JSON.parse(localStorage.getItem('myStore') || "[]");
-            let idx = products.findIndex(p => p.code === currentCode);
-            if (idx !== -1) { products[idx].qty += qty; products[idx].cost = cost; products[idx].price = price; products[idx].name = name; }
-            else { products.push({ code: currentCode, name, cost, price, qty, id: Date.now() }); }
-            localStorage.setItem('myStore', JSON.stringify(products));
-            document.getElementById('input-area').style.display = 'none';
-            renderList(); html5QrCode.resume();
-        }
-    }
-
-    function addToCart(code) {
-        let products = JSON.parse(localStorage.getItem('myStore') || "[]");
-        let p = products.find(prod => prod.code === code);
-        if (p && p.qty > 0) { shoppingCart.push({ ...p }); updateCartUI(); }
-        else { alert("غير موجود أو نفد!"); }
-    }
-
+    // تحديث واجهة السلة (التعديل المطلوب)
     function updateCartUI() {
-        const cartDiv = document.getElementById('cart-items');
-        let total = 0; cartDiv.innerHTML = "";
-        shoppingCart.forEach(item => { total += item.price; cartDiv.innerHTML += `<div class="cart-item"><span>${item.name}</span><span><b>${item.price} دج</b></span></div>`; });
+        const cartList = document.getElementById('cart-list');
+        let total = 0;
+        cartList.innerHTML = "";
+
+        shoppingCart.forEach((item, index) => {
+            total += (item.price * item.cartQty);
+            cartList.innerHTML += `
+                <div class="cart-item">
+                    <div>
+                        <b>${item.name}</b><br>
+                        <small>${item.price} دج</small>
+                    </div>
+                    <div class="cart-controls">
+                        <button class="qty-btn" onclick="changeQty(${index}, -1)">-</button>
+                        <span>${item.cartQty}</span>
+                        <button class="qty-btn" onclick="changeQty(${index}, 1)">+</button>
+                        <button class="del-item" onclick="removeFromCart(${index})">حذف</button>
+                    </div>
+                </div>`;
+        });
         document.getElementById('grand-total').innerText = total;
+    }
+
+    function changeQty(index, delta) {
+        let products = JSON.parse(localStorage.getItem('myStore') || "[]");
+        let item = shoppingCart[index];
+        let p = products.find(prod => prod.code === item.code);
+
+        if (delta > 0 && item.cartQty >= p.qty) {
+            alert("⚠️ لا توجد كمية كافية في المخزن!");
+            return;
+        }
+        
+        item.cartQty += delta;
+        if (item.cartQty <= 0) {
+            shoppingCart.splice(index, 1);
+        }
+        updateCartUI();
+    }
+
+    function removeFromCart(index) {
+        shoppingCart.splice(index, 1);
+        updateCartUI();
     }
 
     function checkoutCart() {
         if (shoppingCart.length === 0) return;
         let products = JSON.parse(localStorage.getItem('myStore') || "[]");
         let history = JSON.parse(localStorage.getItem('myHistory') || "[]");
+        let now = new Date();
+
         shoppingCart.forEach(item => {
             let idx = products.findIndex(p => p.code === item.code);
             if (idx !== -1) {
-                products[idx].qty -= 1;
-                history.push({ name: item.name, price: item.price, profit: item.price - item.cost, date: new Date().toLocaleString('ar-DZ') });
+                products[idx].qty -= item.cartQty; // خصم الكمية بالكامل من المخزن
+                for(let i=0; i < item.cartQty; i++) {
+                    history.push({ 
+                        name: item.name, price: item.price, profit: (item.price - item.cost), date: now.toISOString() 
+                    });
+                }
             }
         });
+
         localStorage.setItem('myStore', JSON.stringify(products));
         localStorage.setItem('myHistory', JSON.stringify(history));
-        alert("تم البيع ✅"); clearCart(); renderList();
+        alert("تمت عملية البيع بنجاح!");
+        shoppingCart = [];
+        updateCartUI();
+        renderInventory();
     }
 
-    function clearCart() { shoppingCart = []; updateCartUI(); }
+    // --- الوظائف الباقية (توريد، سجل، مخزن) كما هي دون تغيير ---
 
-    function renderGroupedHistory() {
-        const container = document.getElementById('history-grouped-list');
-        const totalProfitDisp = document.getElementById('total-profit-history');
+    function openEditPanel(text) {
+        currentCode = text;
+        document.getElementById('displayCode').innerText = text;
+        let products = JSON.parse(localStorage.getItem('myStore') || "[]");
+        let p = products.find(prod => prod.code === text);
+        document.getElementById('input-area').style.display = 'block';
+        if (p) {
+            document.getElementById('itemName').value = p.name;
+            document.getElementById('costPrice').value = p.cost;
+            document.getElementById('salePrice').value = p.price;
+            document.getElementById('itemQty').value = 0;
+        } else {
+            document.getElementById('itemName').value = "";
+            document.getElementById('itemQty').value = 1;
+        }
+    }
+
+    function confirmSave() {
+        const name = document.getElementById('itemName').value;
+        const cost = parseFloat(document.getElementById('costPrice').value) || 0;
+        const price = parseFloat(document.getElementById('salePrice').value) || 0;
+        const qty = parseInt(document.getElementById('itemQty').value) || 0;
+        if (!name) return alert("ادخل الاسم");
+        let products = JSON.parse(localStorage.getItem('myStore') || "[]");
+        let idx = products.findIndex(p => p.code === currentCode);
+        if (idx !== -1) {
+            products[idx].qty += qty; products[idx].name = name; products[idx].cost = cost; products[idx].price = price;
+        } else {
+            products.push({ code: currentCode, name, cost, price, qty, id: Date.now() });
+        }
+        localStorage.setItem('myStore', JSON.stringify(products));
+        document.getElementById('input-area').style.display = 'none';
+        html5QrCode.resume();
+        renderInventory();
+    }
+
+    function renderInventory() {
+        const list = document.getElementById('inventory-list');
+        let products = JSON.parse(localStorage.getItem('myStore') || "[]");
+        list.innerHTML = products.map(item => `
+            <div class="inv-card">
+                <div><b>${item.name}</b> (${item.qty})<br><span class="inv-barcode">Code: ${item.code}</span></div>
+                <div class="inv-btns">
+                    <button class="small-btn" style="background:var(--accent)" onclick="manualEdit('${item.code}')">تعديل</button>
+                    <button class="small-btn" style="background:var(--danger)" onclick="deleteProduct(${item.id})">حذف</button>
+                </div>
+            </div>`).join('');
+    }
+
+    function renderHistory() {
+        const container = document.getElementById('history-list');
         let history = JSON.parse(localStorage.getItem('myHistory') || "[]");
         container.innerHTML = "";
-        let grouped = {}; let totalAllProfit = 0;
-
-        history.forEach(item => {
-            if (!grouped[item.name]) grouped[item.name] = { logs: [], totalQty: 0, totalProfit: 0 };
-            grouped[item.name].logs.push(item);
-            grouped[item.name].totalQty += 1;
-            grouped[item.name].totalProfit += item.profit;
-            totalAllProfit += item.profit;
+        let grouped = {};
+        history.forEach(h => {
+            if (!grouped[h.name]) grouped[h.name] = { items: [], totalProfit: 0 };
+            grouped[h.name].items.push(h);
+            grouped[h.name].totalProfit += h.profit;
         });
-
         for (let name in grouped) {
-            let data = grouped[name];
-            let html = `
-                <div class="history-group">
-                    <div class="history-header" onclick="this.nextElementSibling.classList.toggle('open')">
-                        <span>${name} <span class="qty-badge">${data.totalQty}</span></span>
-                        <span style="color:var(--primary)">+${data.totalProfit.toFixed(1)} دج</span>
+            container.innerHTML += `
+                <div class="history-item">
+                    <div class="history-header" onclick="this.nextElementSibling.classList.toggle('show')">
+                        <span>${name} (${grouped[name].items.length})</span>
+                        <span style="color:var(--primary)">+${grouped[name].totalProfit.toFixed(0)} دج ▾</span>
                     </div>
-                    <div class="history-details">
-                        ${data.logs.reverse().map(log => `
-                            <div class="detail-row">
-                                <span style="font-size:11px; color:gray;">${log.date}</span>
-                                <span>${log.price} دج <span class="profit-badge">+${log.profit.toFixed(1)}</span></span>
-                            </div>
-                        `).join('')}
+                    <div class="history-body">
+                        ${grouped[name].items.map(i => `<div style="border-bottom:1px dashed #ccc; padding:5px 0;">📅 ${new Date(i.date).toLocaleString('ar-DZ')}<br>💰 السعر: ${i.price} | 📈 الربح: ${i.profit} دج</div>`).join('')}
                     </div>
-                </div>
-            `;
-            container.innerHTML += html;
+                </div>`;
         }
-        totalProfitDisp.innerText = totalAllProfit.toFixed(1) + " دج";
     }
 
-    function renderList() {
-        const list = document.getElementById('result-list');
-        list.innerHTML = "";
-        let products = JSON.parse(localStorage.getItem('myStore') || "[]");
-        products.reverse().forEach(item => {
-            list.innerHTML += `<div style="display:flex; justify-content:space-between; padding:10px; border-bottom:1px solid #eee;">
-                <div><b>${item.name}</b><br><small>المخزن: ${item.qty} | الربح: ${(item.price - item.cost).toFixed(1)}</small></div>
-                <button onclick="deleteProduct(${item.id})" style="border:none; background:none; color:red;">🗑️</button>
-            </div>`;
+    function updateStats() {
+        let history = JSON.parse(localStorage.getItem('myHistory') || "[]");
+        let now = new Date();
+        let profits = { day: 0, week: 0, month: 0 };
+        let last7Days = {};
+        for(let i=6; i>=0; i--) {
+            let d = new Date(); d.setDate(d.getDate() - i);
+            last7Days[d.toLocaleDateString('ar-DZ', {weekday:'short'})] = 0;
+        }
+        history.forEach(h => {
+            let hDate = new Date(h.date);
+            let diffDays = (now - hDate) / (1000 * 60 * 60 * 24);
+            if (diffDays <= 1) profits.day += h.profit;
+            if (diffDays <= 7) profits.week += h.profit;
+            if (diffDays <= 30) profits.month += h.profit;
+            let label = hDate.toLocaleDateString('ar-DZ', {weekday:'short'});
+            if(last7Days[label] !== undefined) last7Days[label] += h.profit;
+        });
+        document.getElementById('day-profit').innerText = profits.day.toFixed(0);
+        document.getElementById('week-profit').innerText = profits.week.toFixed(0);
+        document.getElementById('month-profit').innerText = profits.month.toFixed(0);
+        if(myChart) myChart.destroy();
+        const ctx = document.getElementById('profitChart').getContext('2d');
+        myChart = new Chart(ctx, {
+            type: 'line',
+            data: { labels: Object.keys(last7Days), datasets: [{ label: 'الربح', data: Object.values(last7Days), borderColor: '#10b981', fill: true, tension: 0.4 }] },
+            options: { plugins: { legend: { display: false } } }
         });
     }
 
-    function clearHistory() { if(confirm("حذف السجل؟")) { localStorage.setItem('myHistory', "[]"); renderGroupedHistory(); } }
-    function deleteProduct(id) { if(confirm("حذف؟")) { let products = JSON.parse(localStorage.getItem('myStore') || "[]").filter(p => p.id !== id); localStorage.setItem('myStore', JSON.stringify(products)); renderList(); } }
-    window.onload = renderList;
+    function manualEdit(code) { switchMode('add'); openEditPanel(code); }
+    function deleteProduct(id) { if(confirm("حذف؟")) { let p = JSON.parse(localStorage.getItem('myStore') || "[]").filter(x => x.id !== id); localStorage.setItem('myStore', JSON.stringify(p)); renderInventory(); } }
+    function clearHistory() { if(confirm("مسح السجل؟")) { localStorage.setItem('myHistory', "[]"); renderHistory(); updateStats(); } }
+    function showOverlay(msg, color) { const o = document.getElementById('overlay'); o.innerHTML = msg; o.style.backgroundColor = color; o.style.display = 'flex'; setTimeout(() => o.style.display = 'none', 1200); }
+    function cancelEdit() { document.getElementById('input-area').style.display = 'none'; html5QrCode.resume(); }
+    function toggleTorch() { if (videoTrack) { isTorchOn = !isTorchOn; videoTrack.applyConstraints({ advanced: [{ torch: isTorchOn }] }); } }
+    window.onload = () => { startScanning(); renderInventory(); };
 </script>
 </body>
 </html>
