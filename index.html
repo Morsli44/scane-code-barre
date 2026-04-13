@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#2563eb">
-    <title>مخزني الذكي برو - نسخة الفلاش</title>
+    <title>مخزني الذكي برو</title>
 
     <script src="https://unpkg.com/html5-qrcode"></script>
 
@@ -21,10 +21,9 @@
         .sale-mode.active { background: var(--sale); }
         .history-mode.active { background: var(--history); }
 
-        #reader { width: 100%; border-radius: 20px; overflow: hidden; border: 3px solid #f1f5f9; background: #000; position: relative; }
+        #reader { width: 100%; border-radius: 20px; overflow: hidden; border: 3px solid #f1f5f9; background: #000; position: relative; min-height: 250px; }
         #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; color: white; font-size: 18px; z-index: 10; border-radius: 20px; }
 
-        /* ستايل زر الفلاش الجديد */
         #torch-btn { 
             position: absolute; top: 15px; left: 15px; z-index: 100; 
             background: rgba(255,255,255,0.9); border: none; border-radius: 50%; 
@@ -106,7 +105,7 @@
 </div>
 
 <script>
-    const html5QrCode = new Html5Qrcode("reader");
+    let html5QrCode;
     let currentMode = 'add', lastResult = null, count = 0, currentCode = "", shoppingCart = [];
     let videoTrack = null;
     let isTorchOn = false;
@@ -123,36 +122,45 @@
     }
 
     async function startScanning() {
+        html5QrCode = new Html5Qrcode("reader");
         document.getElementById('start-btn').style.display = 'none';
+        
         try {
-            await html5QrCode.start({ facingMode: "environment" }, { fps: 25, qrbox: 250 }, (text) => {
-                if (text === lastResult) count++; else { lastResult = text; count = 1; }
-                if (count >= 3) {
-                    html5QrCode.pause();
-                    if (navigator.vibrate) navigator.vibrate(50);
-                    if (currentMode === 'add') {
-                        currentCode = text;
-                        fillExistingData(text);
-                        document.getElementById('input-area').style.display = 'block';
-                    } else {
-                        addToCart(text);
-                        document.getElementById('overlay').style.display = 'flex';
-                        setTimeout(() => { document.getElementById('overlay').style.display = 'none'; count = 0; lastResult = null; html5QrCode.resume(); }, 1200);
+            await html5QrCode.start(
+                { facingMode: "environment" }, 
+                { fps: 25, qrbox: 250 }, 
+                (text) => {
+                    if (text === lastResult) count++; else { lastResult = text; count = 1; }
+                    if (count >= 3) {
+                        html5QrCode.pause();
+                        if (navigator.vibrate) navigator.vibrate(50);
+                        if (currentMode === 'add') {
+                            currentCode = text;
+                            fillExistingData(text);
+                            document.getElementById('input-area').style.display = 'block';
+                        } else {
+                            addToCart(text);
+                            document.getElementById('overlay').style.display = 'flex';
+                            setTimeout(() => { document.getElementById('overlay').style.display = 'none'; count = 0; lastResult = null; html5QrCode.resume(); }, 1200);
+                        }
                     }
                 }
-            });
+            );
 
-            // كود الفلاش: المحاولة بعد تشغيل الكاميرا
-            const video = document.querySelector('#reader video');
-            if (video && video.srcObject) {
-                videoTrack = video.srcObject.getVideoTracks()[0];
-                const capabilities = videoTrack.getCapabilities ? videoTrack.getCapabilities() : {};
-                if (capabilities.torch) {
-                    document.getElementById('torch-btn').style.display = 'flex';
+            // تفعيل الفلاش بعد استقرار الكاميرا
+            setTimeout(() => {
+                const video = document.querySelector('#reader video');
+                if (video && video.srcObject) {
+                    videoTrack = video.srcObject.getVideoTracks()[0];
+                    const caps = videoTrack.getCapabilities ? videoTrack.getCapabilities() : {};
+                    if (caps.torch) {
+                        document.getElementById('torch-btn').style.display = 'flex';
+                    }
                 }
-            }
+            }, 1000);
+
         } catch (err) {
-            alert("خطأ في تشغيل الكاميرا");
+            alert("خطأ: " + err);
             document.getElementById('start-btn').style.display = 'block';
         }
     }
@@ -161,11 +169,11 @@
         if (!videoTrack) return;
         isTorchOn = !isTorchOn;
         videoTrack.applyConstraints({ advanced: [{ torch: isTorchOn }] })
-            .then(() => {
-                const btn = document.getElementById('torch-btn');
-                btn.innerHTML = isTorchOn ? "💡" : "🔦";
-                btn.style.background = isTorchOn ? "var(--sale)" : "rgba(255,255,255,0.9)";
-            }).catch(e => console.error(e));
+        .then(() => {
+            const btn = document.getElementById('torch-btn');
+            btn.innerHTML = isTorchOn ? "💡" : "🔦";
+            btn.style.background = isTorchOn ? "var(--sale)" : "rgba(255,255,255,0.9)";
+        }).catch(e => alert("الفلاش مشغول أو غير مدعوم"));
     }
 
     function fillExistingData(code) {
@@ -249,7 +257,7 @@
                 <div class="history-group">
                     <div class="history-header" onclick="this.nextElementSibling.classList.toggle('open')">
                         <span>${name} <span class="qty-badge">${data.totalQty}</span></span>
-                        <span style="color:var(--primary)">+${data.totalProfit.toFixed(2)} دج</span>
+                        <span style="color:var(--primary)">+${data.totalProfit.toFixed(1)} دج</span>
                     </div>
                     <div class="history-details">
                         ${data.logs.reverse().map(log => `
@@ -263,7 +271,7 @@
             `;
             container.innerHTML += html;
         }
-        totalProfitDisp.innerText = totalAllProfit.toFixed(2) + " دج";
+        totalProfitDisp.innerText = totalAllProfit.toFixed(1) + " دج";
     }
 
     function renderList() {
@@ -272,7 +280,7 @@
         let products = JSON.parse(localStorage.getItem('myStore') || "[]");
         products.reverse().forEach(item => {
             list.innerHTML += `<div style="display:flex; justify-content:space-between; padding:10px; border-bottom:1px solid #eee;">
-                <div><b>${item.name}</b><br><small>المخزن: ${item.qty} | الربح المتوقع: ${(item.price - item.cost).toFixed(1)}</small></div>
+                <div><b>${item.name}</b><br><small>المخزن: ${item.qty} | الربح: ${(item.price - item.cost).toFixed(1)}</small></div>
                 <button onclick="deleteProduct(${item.id})" style="border:none; background:none; color:red;">🗑️</button>
             </div>`;
         });
