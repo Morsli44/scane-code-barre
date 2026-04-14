@@ -3,21 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>نظام المخزن المطور - التحكم في السلة</title>
+    <title>نظام المخزن المطور - التحكم في السلة والنواقص</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root { --primary: #10b981; --accent: #2563eb; --sale: #f59e0b; --danger: #ef4444; --bg: #f8fafc; --history: #8b5cf6; }
+        :root { --primary: #10b981; --accent: #2563eb; --sale: #f59e0b; --danger: #ef4444; --bg: #f8fafc; --history: #8b5cf6; --warning: #f43f5e; }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { font-family: system-ui, sans-serif; background: var(--bg); margin: 0; padding: 10px; direction: rtl; }
         .container { width: 100%; max-width: 500px; background: white; padding: 15px; border-radius: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); margin: auto; }
         
-        .tabs { display: flex; gap: 5px; margin-bottom: 15px; }
-        .tab-btn { flex: 1; padding: 12px 5px; border: none; border-radius: 12px; cursor: pointer; font-weight: bold; background: #f1f5f9; transition: 0.3s; }
+        .tabs { display: flex; gap: 5px; margin-bottom: 15px; flex-wrap: wrap; }
+        .tab-btn { flex: 1; min-width: 70px; padding: 10px 5px; border: none; border-radius: 12px; cursor: pointer; font-weight: bold; background: #f1f5f9; transition: 0.3s; font-size: 13px; }
         .tab-btn.active { color: white; }
         .add-mode.active { background: var(--primary); }
         .sale-mode.active { background: var(--sale); }
         .history-mode.active { background: var(--history); }
+        .low-stock-mode.active { background: var(--warning); }
+        .badge { background: white; color: var(--warning); padding: 2px 6px; border-radius: 50%; font-size: 10px; margin-right: 4px; }
 
         #reader { width: 100%; border-radius: 20px; overflow: hidden; border: 4px solid #f1f5f9; position: relative; min-height: 250px; background: #000; }
         #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; align-items: center; justify-content: center; color: white; font-size: 22px; z-index: 10; font-weight: bold; border-radius: 20px; text-align: center; padding: 10px; }
@@ -30,7 +32,6 @@
         
         .total-box { background: var(--sale); color: white; padding: 15px; border-radius: 12px; margin-top: 10px; font-size: 22px; font-weight: 900; text-align: center; }
 
-        /* ستايل السلة الجديد */
         .cart-item { background: #fff; border: 1px solid #e2e8f0; padding: 10px; border-radius: 15px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
         .cart-controls { display: flex; align-items: center; gap: 10px; }
         .qty-btn { width: 30px; height: 30px; border-radius: 8px; border: none; background: #e2e8f0; font-weight: bold; cursor: pointer; }
@@ -50,6 +51,10 @@
         .inv-barcode { font-size: 11px; color: #64748b; font-family: monospace; }
         .inv-btns { display: flex; gap: 5px; }
         .small-btn { padding: 6px 10px; border: none; border-radius: 8px; color: white; cursor: pointer; font-size: 12px; font-weight: bold; }
+
+        /* ستايل النواقص */
+        .low-stock-card { background: #fff1f2; border: 1px solid #fda4af; padding: 12px; border-radius: 15px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+        .low-stock-qty { color: var(--danger); font-weight: 900; font-size: 18px; }
     </style>
 </head>
 <body>
@@ -59,6 +64,7 @@
         <button class="tab-btn add-mode active" onclick="switchMode('add')">📥 توريد</button>
         <button class="tab-btn sale-mode" onclick="switchMode('sale')">🛒 بيع</button>
         <button class="tab-btn history-mode" onclick="switchMode('history')">📜 السجل</button>
+        <button class="tab-btn low-stock-mode" onclick="switchMode('low-stock')">⚠️ نواقص <span id="low-count" class="badge">0</span></button>
     </div>
 
     <div id="scanner-section">
@@ -80,7 +86,8 @@
 
     <div id="sale-panel" class="panel">
         <div id="cart-area">
-            <div id="cart-list"></div> <div class="total-box">المجموع: <span id="grand-total">0</span> دج</div>
+            <div id="cart-list"></div>
+            <div class="total-box">المجموع: <span id="grand-total">0</span> دج</div>
             <button class="btn" style="background:var(--accent)" onclick="checkoutCart()">تأكيد عملية البيع ✅</button>
         </div>
     </div>
@@ -97,6 +104,11 @@
         <button class="btn" style="background:var(--danger); font-size: 12px;" onclick="clearHistory()">مسح السجل</button>
     </div>
 
+    <div id="low-stock-panel" class="panel">
+        <h3 style="color: var(--danger); border-bottom: 2px solid var(--warning); padding-bottom: 5px;">⚠️ منتجات أوشكت على النفاذ (أقل من 10)</h3>
+        <div id="low-stock-list"></div>
+    </div>
+
     <div style="margin-top:20px;">
         <details>
             <summary style="cursor:pointer; padding:12px; background:#f1f5f9; border-radius:12px; font-weight:bold;">📦 المخزن</summary>
@@ -107,7 +119,7 @@
 
 <script>
     let html5QrCode;
-    let shoppingCart = []; // ستخزن الآن كائنات: {code, name, price, cost, cartQty}
+    let shoppingCart = [];
     let isScanning = false, currentMode = 'add', currentCode = "";
     let videoTrack = null, isTorchOn = false, lastProcessedTime = 0, myChart = null;
 
@@ -117,8 +129,9 @@
         document.querySelector('.' + mode + '-mode').classList.add('active');
         document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
         document.getElementById(mode + '-panel').classList.add('active');
-        document.getElementById('scanner-section').style.display = (mode === 'history') ? 'none' : 'block';
+        document.getElementById('scanner-section').style.display = (mode === 'history' || mode === 'low-stock') ? 'none' : 'block';
         if(mode === 'history') { renderHistory(); updateStats(); }
+        if(mode === 'low-stock') renderLowStock();
     }
 
     async function startScanning() {
@@ -145,52 +158,26 @@
     function onSaleScan(text) {
         let products = JSON.parse(localStorage.getItem('myStore') || "[]");
         let p = products.find(prod => prod.code === text);
-        
         if (p) {
             let itemInCart = shoppingCart.find(item => item.code === text);
             if (itemInCart) {
-                if (itemInCart.cartQty < p.qty) {
-                    itemInCart.cartQty++;
-                } else {
-                    alert("⚠️ المخزون لا يكفي!");
-                    return;
-                }
+                if (itemInCart.cartQty < p.qty) { itemInCart.cartQty++; } 
+                else { alert("⚠️ المخزون لا يكفي!"); return; }
             } else {
-                if (p.qty > 0) {
-                    shoppingCart.push({ ...p, cartQty: 1 });
-                } else {
-                    alert("⚠️ المنتج نافد من المخزن!");
-                    return;
-                }
+                if (p.qty > 0) { shoppingCart.push({ ...p, cartQty: 1 }); } 
+                else { alert("⚠️ المنتج نافد!"); return; }
             }
             updateCartUI();
             showOverlay("تمت الإضافة ✅", "var(--primary)");
-        } else {
-            showOverlay("غير موجود!", "gray");
-        }
+        } else { showOverlay("غير موجود!", "gray"); }
     }
 
-    // تحديث واجهة السلة (التعديل المطلوب)
     function updateCartUI() {
         const cartList = document.getElementById('cart-list');
-        let total = 0;
-        cartList.innerHTML = "";
-
+        let total = 0; cartList.innerHTML = "";
         shoppingCart.forEach((item, index) => {
             total += (item.price * item.cartQty);
-            cartList.innerHTML += `
-                <div class="cart-item">
-                    <div>
-                        <b>${item.name}</b><br>
-                        <small>${item.price} دج</small>
-                    </div>
-                    <div class="cart-controls">
-                        <button class="qty-btn" onclick="changeQty(${index}, -1)">-</button>
-                        <span>${item.cartQty}</span>
-                        <button class="qty-btn" onclick="changeQty(${index}, 1)">+</button>
-                        <button class="del-item" onclick="removeFromCart(${index})">حذف</button>
-                    </div>
-                </div>`;
+            cartList.innerHTML += `<div class="cart-item"><div><b>${item.name}</b><br><small>${item.price} دج</small></div><div class="cart-controls"><button class="qty-btn" onclick="changeQty(${index}, -1)">-</button><span>${item.cartQty}</span><button class="qty-btn" onclick="changeQty(${index}, 1)">+</button><button class="del-item" onclick="removeFromCart(${index})">حذف</button></div></div>`;
         });
         document.getElementById('grand-total').innerText = total;
     }
@@ -199,52 +186,54 @@
         let products = JSON.parse(localStorage.getItem('myStore') || "[]");
         let item = shoppingCart[index];
         let p = products.find(prod => prod.code === item.code);
-
-        if (delta > 0 && item.cartQty >= p.qty) {
-            alert("⚠️ لا توجد كمية كافية في المخزن!");
-            return;
-        }
-        
+        if (delta > 0 && item.cartQty >= p.qty) { alert("⚠️ لا توجد كمية كافية!"); return; }
         item.cartQty += delta;
-        if (item.cartQty <= 0) {
-            shoppingCart.splice(index, 1);
-        }
+        if (item.cartQty <= 0) shoppingCart.splice(index, 1);
         updateCartUI();
     }
 
-    function removeFromCart(index) {
-        shoppingCart.splice(index, 1);
-        updateCartUI();
-    }
+    function removeFromCart(index) { shoppingCart.splice(index, 1); updateCartUI(); }
 
     function checkoutCart() {
         if (shoppingCart.length === 0) return;
         let products = JSON.parse(localStorage.getItem('myStore') || "[]");
         let history = JSON.parse(localStorage.getItem('myHistory') || "[]");
         let now = new Date();
-
         shoppingCart.forEach(item => {
             let idx = products.findIndex(p => p.code === item.code);
             if (idx !== -1) {
-                products[idx].qty -= item.cartQty; // خصم الكمية بالكامل من المخزن
+                products[idx].qty -= item.cartQty;
                 for(let i=0; i < item.cartQty; i++) {
-                    history.push({ 
-                        name: item.name, price: item.price, profit: (item.price - item.cost), date: now.toISOString() 
-                    });
+                    history.push({ name: item.name, price: item.price, profit: (item.price - item.cost), date: now.toISOString() });
                 }
             }
         });
-
         localStorage.setItem('myStore', JSON.stringify(products));
         localStorage.setItem('myHistory', JSON.stringify(history));
-        alert("تمت عملية البيع بنجاح!");
-        shoppingCart = [];
-        updateCartUI();
-        renderInventory();
+        alert("تمت العملية!"); shoppingCart = []; updateCartUI(); renderInventory(); updateLowStockBadge();
     }
 
-    // --- الوظائف الباقية (توريد، سجل، مخزن) كما هي دون تغيير ---
+    function renderLowStock() {
+        const container = document.getElementById('low-stock-list');
+        let products = JSON.parse(localStorage.getItem('myStore') || "[]");
+        // تصفية السلع أقل من 10 وترتيبها تصاعدياً
+        let lowItems = products.filter(p => p.qty < 10).sort((a, b) => a.qty - b.qty);
+        container.innerHTML = lowItems.length === 0 ? "<p style='text-align:center; padding:20px;'>لا توجد نواقص حالياً 👍</p>" : 
+            lowItems.map(item => `
+            <div class="low-stock-card">
+                <div><b>${item.name}</b><br><small>كود: ${item.code}</small></div>
+                <div class="low-stock-qty">${item.qty} <span style="font-size:10px;">باقي</span></div>
+                <button class="small-btn" style="background:var(--accent)" onclick="manualEdit('${item.code}')">تعبئة</button>
+            </div>`).join('');
+    }
 
+    function updateLowStockBadge() {
+        let products = JSON.parse(localStorage.getItem('myStore') || "[]");
+        let count = products.filter(p => p.qty < 10).length;
+        document.getElementById('low-count').innerText = count;
+    }
+
+    // --- الوظائف الأساسية كما هي ---
     function openEditPanel(text) {
         currentCode = text;
         document.getElementById('displayCode').innerText = text;
@@ -277,8 +266,7 @@
         }
         localStorage.setItem('myStore', JSON.stringify(products));
         document.getElementById('input-area').style.display = 'none';
-        html5QrCode.resume();
-        renderInventory();
+        html5QrCode.resume(); renderInventory(); updateLowStockBadge();
     }
 
     function renderInventory() {
@@ -301,20 +289,10 @@
         let grouped = {};
         history.forEach(h => {
             if (!grouped[h.name]) grouped[h.name] = { items: [], totalProfit: 0 };
-            grouped[h.name].items.push(h);
-            grouped[h.name].totalProfit += h.profit;
+            grouped[h.name].items.push(h); grouped[h.name].totalProfit += h.profit;
         });
         for (let name in grouped) {
-            container.innerHTML += `
-                <div class="history-item">
-                    <div class="history-header" onclick="this.nextElementSibling.classList.toggle('show')">
-                        <span>${name} (${grouped[name].items.length})</span>
-                        <span style="color:var(--primary)">+${grouped[name].totalProfit.toFixed(0)} دج ▾</span>
-                    </div>
-                    <div class="history-body">
-                        ${grouped[name].items.map(i => `<div style="border-bottom:1px dashed #ccc; padding:5px 0;">📅 ${new Date(i.date).toLocaleString('ar-DZ')}<br>💰 السعر: ${i.price} | 📈 الربح: ${i.profit} دج</div>`).join('')}
-                    </div>
-                </div>`;
+            container.innerHTML += `<div class="history-item"><div class="history-header" onclick="this.nextElementSibling.classList.toggle('show')"><span>${name} (${grouped[name].items.length})</span><span style="color:var(--primary)">+${grouped[name].totalProfit.toFixed(0)} دج ▾</span></div><div class="history-body">${grouped[name].items.map(i => `<div style="border-bottom:1px dashed #ccc; padding:5px 0;">📅 ${new Date(i.date).toLocaleString('ar-DZ')}<br>💰 السعر: ${i.price} | 📈 الربح: ${i.profit} دج</div>`).join('')}</div></div>`;
         }
     }
 
@@ -341,20 +319,16 @@
         document.getElementById('month-profit').innerText = profits.month.toFixed(0);
         if(myChart) myChart.destroy();
         const ctx = document.getElementById('profitChart').getContext('2d');
-        myChart = new Chart(ctx, {
-            type: 'line',
-            data: { labels: Object.keys(last7Days), datasets: [{ label: 'الربح', data: Object.values(last7Days), borderColor: '#10b981', fill: true, tension: 0.4 }] },
-            options: { plugins: { legend: { display: false } } }
-        });
+        myChart = new Chart(ctx, { type: 'line', data: { labels: Object.keys(last7Days), datasets: [{ label: 'الربح', data: Object.values(last7Days), borderColor: '#10b981', fill: true, tension: 0.4 }] }, options: { plugins: { legend: { display: false } } } });
     }
 
     function manualEdit(code) { switchMode('add'); openEditPanel(code); }
-    function deleteProduct(id) { if(confirm("حذف؟")) { let p = JSON.parse(localStorage.getItem('myStore') || "[]").filter(x => x.id !== id); localStorage.setItem('myStore', JSON.stringify(p)); renderInventory(); } }
-    function clearHistory() { if(confirm("مسح السجل؟")) { localStorage.setItem('myHistory', "[]"); renderHistory(); updateStats(); } }
+    function deleteProduct(id) { if(confirm("حذف؟")) { let p = JSON.parse(localStorage.getItem('myStore') || "[]").filter(x => x.id !== id); localStorage.setItem('myStore', JSON.stringify(p)); renderInventory(); updateLowStockBadge(); } }
+    function clearHistory() { if(confirm("مسح؟")) { localStorage.setItem('myHistory', "[]"); renderHistory(); updateStats(); } }
     function showOverlay(msg, color) { const o = document.getElementById('overlay'); o.innerHTML = msg; o.style.backgroundColor = color; o.style.display = 'flex'; setTimeout(() => o.style.display = 'none', 1200); }
     function cancelEdit() { document.getElementById('input-area').style.display = 'none'; html5QrCode.resume(); }
     function toggleTorch() { if (videoTrack) { isTorchOn = !isTorchOn; videoTrack.applyConstraints({ advanced: [{ torch: isTorchOn }] }); } }
-    window.onload = () => { startScanning(); renderInventory(); };
+    window.onload = () => { startScanning(); renderInventory(); updateLowStockBadge(); };
 </script>
 </body>
 </html>
